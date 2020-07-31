@@ -8,11 +8,11 @@
 #include <iostream>
 #include "TCPServer.h"
 
-#define PORT 8889
+// https://blog.csdn.net/winnie_rq/article/details/52177489
 
 int main()
 {
-	TCPServer server(PORT);
+	TCPServer server;
 	server.startUp();
 
     std::cout << "server\n"; 

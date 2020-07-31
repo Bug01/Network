@@ -4,11 +4,6 @@ TCPServer::TCPServer()
 {
 }
 
-TCPServer::TCPServer(int port)
-{
-	m_port = port;
-}
-
 
 TCPServer::~TCPServer()
 {
@@ -38,7 +33,7 @@ bool TCPServer::startUp()
 	// °ó¶¨Ì×½Ó×Ö
 	sockaddr_in addr;
 	addr.sin_family = AF_INET;
-	addr.sin_port = htons(m_port);
+	addr.sin_port = htons(SERVER_PORT);
 	addr.sin_addr.S_un.S_addr = htonl(INADDR_LOOPBACK);
 	errcode = bind(m_socket, (SOCKADDR*)&addr, sizeof(addr));
 	if (errcode == SOCKET_ERROR)
