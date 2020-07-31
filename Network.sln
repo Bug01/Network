@@ -1,0 +1,47 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 15
+VisualStudioVersion = 15.0.28307.852
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "阻塞模型", "阻塞模型", "{303A3B48-B9E2-44A1-93B3-9310A54EF7B3}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "server", "阻塞模型\server\server.vcxproj", "{E2CA5EFF-E302-4756-BEA4-005BA80CD632}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "client", "阻塞模型\client\client.vcxproj", "{B7020CFD-DBC3-4D47-9BC0-F4B6838EFC6E}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+		Debug|x86 = Debug|x86
+		Release|x64 = Release|x64
+		Release|x86 = Release|x86
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{E2CA5EFF-E302-4756-BEA4-005BA80CD632}.Debug|x64.ActiveCfg = Debug|x64
+		{E2CA5EFF-E302-4756-BEA4-005BA80CD632}.Debug|x64.Build.0 = Debug|x64
+		{E2CA5EFF-E302-4756-BEA4-005BA80CD632}.Debug|x86.ActiveCfg = Debug|Win32
+		{E2CA5EFF-E302-4756-BEA4-005BA80CD632}.Debug|x86.Build.0 = Debug|Win32
+		{E2CA5EFF-E302-4756-BEA4-005BA80CD632}.Release|x64.ActiveCfg = Release|x64
+		{E2CA5EFF-E302-4756-BEA4-005BA80CD632}.Release|x64.Build.0 = Release|x64
+		{E2CA5EFF-E302-4756-BEA4-005BA80CD632}.Release|x86.ActiveCfg = Release|Win32
+		{E2CA5EFF-E302-4756-BEA4-005BA80CD632}.Release|x86.Build.0 = Release|Win32
+		{B7020CFD-DBC3-4D47-9BC0-F4B6838EFC6E}.Debug|x64.ActiveCfg = Debug|x64
+		{B7020CFD-DBC3-4D47-9BC0-F4B6838EFC6E}.Debug|x64.Build.0 = Debug|x64
+		{B7020CFD-DBC3-4D47-9BC0-F4B6838EFC6E}.Debug|x86.ActiveCfg = Debug|Win32
+		{B7020CFD-DBC3-4D47-9BC0-F4B6838EFC6E}.Debug|x86.Build.0 = Debug|Win32
+		{B7020CFD-DBC3-4D47-9BC0-F4B6838EFC6E}.Release|x64.ActiveCfg = Release|x64
+		{B7020CFD-DBC3-4D47-9BC0-F4B6838EFC6E}.Release|x64.Build.0 = Release|x64
+		{B7020CFD-DBC3-4D47-9BC0-F4B6838EFC6E}.Release|x86.ActiveCfg = Release|Win32
+		{B7020CFD-DBC3-4D47-9BC0-F4B6838EFC6E}.Release|x86.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{E2CA5EFF-E302-4756-BEA4-005BA80CD632} = {303A3B48-B9E2-44A1-93B3-9310A54EF7B3}
+		{B7020CFD-DBC3-4D47-9BC0-F4B6838EFC6E} = {303A3B48-B9E2-44A1-93B3-9310A54EF7B3}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {38CA5729-9521-40C6-A1C4-A41D0A8D833B}
+	EndGlobalSection
+EndGlobal
