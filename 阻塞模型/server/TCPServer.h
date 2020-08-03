@@ -2,7 +2,7 @@
 //
 // file  : TCPServer.h
 // since : 2020-7-31
-// desc  : windows网络编程-阻塞模式 tcp编程类 
+// desc  : windows网络编程-阻塞模式 tcp_server
 
 
 #ifndef __TCP_SERVER__
@@ -12,7 +12,7 @@
 #include <iostream>
 #include <string>
 
-#pragma comment(lib,"ws2_32.lib")
+#pragma comment(lib, "ws2_32.lib")
 
 #define MAX_BUFFER_LENG	1024
 #define SERVER_PORT 8889
@@ -23,13 +23,12 @@ class TCPServer
 private:
 	SOCKET		m_socket;
 
+	void releaseSocket();
 public:
 	TCPServer();
 	~TCPServer();
 
-	bool startUp();
-
-	void releaseSocket();
+	bool startServer();
 };
 
 

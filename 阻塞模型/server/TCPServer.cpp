@@ -9,7 +9,7 @@ TCPServer::~TCPServer()
 {
 }
 
-bool TCPServer::startUp()
+bool TCPServer::startServer()
 {
 	WSADATA data;
 	int errcode;
@@ -18,7 +18,7 @@ bool TCPServer::startUp()
 	errcode = WSAStartup(MAKEWORD(2, 2), &data);
 	if (errcode != 0)
 	{
-		std::cout << "TCPServer::WSAStartup err. errcode = " << errcode;
+		std::cout << "TCPServer::WSAStartup err.\n";
 		return false;
 	}
 
@@ -26,7 +26,7 @@ bool TCPServer::startUp()
 	m_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 	if (m_socket == INVALID_SOCKET)
 	{
-		std::cout << "TCPServer create socket err.";
+		std::cout << "TCPServer create socket err.\n";
 		return false;
 	}
 
@@ -38,7 +38,7 @@ bool TCPServer::startUp()
 	errcode = bind(m_socket, (SOCKADDR*)&addr, sizeof(addr));
 	if (errcode == SOCKET_ERROR)
 	{
-		std::cout << "TCPServer bind socket err.";
+		std::cout << "TCPServer bind socket err.\n";
 		releaseSocket();
 		return false;
 	}
@@ -47,12 +47,12 @@ bool TCPServer::startUp()
 	errcode = listen(m_socket, 1);
 	if (errcode == SOCKET_ERROR)
 	{
-		std::cout << "TCPServer listen socket err.";
+		std::cout << "TCPServer listen socket err.\n";
 		releaseSocket();
 		return false;
 	}
 
-	std::cout << "server start!";
+	std::cout << "server start!\n";
 
 	sockaddr_in cliAddr;
 	int len = sizeof(cliAddr);
@@ -62,23 +62,27 @@ bool TCPServer::startUp()
 		SOCKET client = accept(m_socket, (SOCKADDR*)&cliAddr, &len);
 		if (client == INVALID_SOCKET)
 		{
-			std::cout << "TCPServer accept socket err.";
+			std::cout << "TCPServer accept socket err.\n";
 			break;
 		}
 
 		// 接收数据
 		char recvBuff[MAX_BUFFER_LENG];
-		recv(client, recvBuff, MAX_BUFFER_LENG, 0);
-		std::cout << inet_ntoa(cliAddr.sin_addr) << ": " << recvBuff;
+
+		int recvLength = recv(client, recvBuff, MAX_BUFFER_LENG, 0);
+
+
+		if (recvLength > 0)
+			std::cout << inet_ntoa(cliAddr.sin_addr) << ": " << recvBuff << std::endl;
+		else
+			std::cout << "have client\n";
 
 		// 关闭客户端连接
-		closesocket(client);
+		// closesocket(client);
 	}
 
 	// 释放 socket
 	releaseSocket();
-	std::cout << "server end!";
-
 	return true;
 }
 
