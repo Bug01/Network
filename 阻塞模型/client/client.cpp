@@ -12,24 +12,13 @@
 int main()
 {
 	TCPClient client;
-	bool bConn;
-	std::string str;
-
-	bConn = client.loginToServer("127.0.0.1", 8889);
-	if (bConn)
-	{
-		std::cout << "connect to server successful!\n";
-
-		while (true)
-		{
-			std::cin >> str;
-			client.sendToServer(str);
-		}
-
-		client.releaseSocket();
-	}
+	if (client.loginToServer("127.0.0.1", 8889))
+		std::cout << "finish!\n";
 	else
-		std::cout << "connect to server failed!\n";
+		std::cout << "connect faild!\n";
+
+
+	Sleep(100000);
 	return 0;
 }
 
