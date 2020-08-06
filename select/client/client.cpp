@@ -1,13 +1,12 @@
-﻿/* 
+﻿/*
  Copyright (c) 2020 by Bug
  file  : client.cpp
- since : 2020-7-31
- desc  : windows网络编程-阻塞模式 客户端代码
+ since : 2020-8-5
+ desc  : windows网络编程-select模式 客户端代码
 */
 
 #include <iostream>
 #include "TCPClient.h"
-
 
 int main()
 {
@@ -19,6 +18,5 @@ int main()
 
 
 	Sleep(100000);
-	return 0;
 }
 
