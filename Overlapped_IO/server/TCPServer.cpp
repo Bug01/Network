@@ -58,10 +58,22 @@ bool TCPServer::StartServerEvent()
 		return false;
 	}
 
-	WSAEVENT eventArray;
-	WSAOVERLAPPED accOverlp;
-	memset(&accOverlp, 0, sizeof(accOverlp));
-	accOverlp.hEvent = eventArray;
+	WSAEVENT eventArray[WSA_MAXIMUM_WAIT_EVENTS];
+	eventArray[0] = WSACreateEvent();
+	
+	WSAOVERLAPPED clientOverlp;
+	memset(&clientOverlp, 0, sizeof(clientOverlp));
+	clientOverlp.hEvent = eventArray[0];
+
+	DWORD recvBytes;
+	DWORD flag;
+	WSABUF dataBuff;
+	char buff[MAX_BUFFER_LENG];
+	dataBuff.len = MAX_BUFFER_LENG;
+	dataBuff.buf = buff;
+
+	
+	WSARecv(m_server, &dataBuff, 1, &recvBytes, &flag, &clientOverlp, NULL);
 
 	return true;
 }

@@ -12,6 +12,8 @@
 
 
 #define SERVER_PORT  8999
+#define MAX_BUFFER_LENG	1024
+
 class TCPServer
 {
 private:
