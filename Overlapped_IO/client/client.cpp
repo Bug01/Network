@@ -2,9 +2,21 @@
 //
 
 #include <iostream>
+#include "TCPClient.h"
+
 
 int main()
 {
     std::cout << "Overlapped_IO client!\n"; 
+
+	TCPClient client;
+	if (client.loginToServer("127.0.0.1", 8889))
+		std::cout << "finish!\n";
+	else
+		std::cout << "connect faild!\n";
+
+
+	Sleep(100000);
+	return 0;
 }
 
