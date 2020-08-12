@@ -34,11 +34,19 @@ private:
 	WSAEVENT		m_clientEvent[WSA_MAXIMUM_WAIT_EVENTS] = {};
 	clientOLData*	m_clientData[WSA_MAXIMUM_WAIT_EVENTS] = {};
 
+
+	
+
 	// 释放
 	void releaseSocket();
 public:
 	TCPServer();
 	~TCPServer();
+
+	static TCPServer* m_this;
+
+	// 重叠I/O的事件通知方法要求将windows事件对象与WSAOVERLAPPED结构关联在一起，若使用
+	// 一个WSAOVERLAPPED结构，发出像WSASend和WSARecv这样的I/O调用，它们会立即返回。
 
 	// 重叠I/O - 事件通知 基础版本（该版本每次只能服务一个客户端）
 	bool startServerEvent_base();
@@ -46,8 +54,18 @@ public:
 	// 重叠I/O - 事件通知
 	bool startServerEvent();
 
-	// 
-	static void dealRecv(TCPServer* s);
+	// 重叠I/O - 事件通知 重叠I/O处理线程
+	static void startServerEvent_recvThread();
+
+
+	// 完成例程其实就是一些函数，我们将这些函数传递给重叠I/O请求，以供重叠I/O请求完成时由系统调用。
+
+	// 重叠I/O - 完成例程
+	bool startServerRoutine();
+
+	static void CALLBACK startServerRoutine_recvCallBack(DWORD dwError, DWORD cbTransferred, LPWSAOVERLAPPED lpOverlapped, DWORD dwFlags);
+
+	
 };
 
 

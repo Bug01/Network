@@ -1,6 +1,7 @@
 #include "TCPServer.h"
 
 
+TCPServer* TCPServer::m_this = nullptr;
 
 TCPServer::TCPServer()
 {
@@ -38,16 +39,25 @@ TCPServer::TCPServer()
 		releaseSocket();
 		return;
 	}
+
+	m_this = this;
 }
 
 
 TCPServer::~TCPServer()
 {
-	for (int i = 0; i < m_clientCount; i++)
+	for (DWORD i = 0; i < m_clientCount; i++)
 	{
 		delete m_clientData[i];
 		m_clientData[i] = NULL;
 	}
+}
+
+
+void TCPServer::releaseSocket()
+{
+	closesocket(m_server);
+	WSACleanup();
 }
 
 
@@ -160,7 +170,7 @@ bool TCPServer::startServerEvent_base()
 bool TCPServer::startServerEvent()
 {
 	// 创建多线程
-	std::thread t(dealRecv, this);
+	std::thread t(startServerEvent_recvThread);
 	t.detach();
 
 	// 等待连接
@@ -216,7 +226,7 @@ bool TCPServer::startServerEvent()
 }
 
 
-void TCPServer::dealRecv(TCPServer* s)
+void TCPServer::startServerEvent_recvThread()
 {
 	while (true)
 	{
@@ -227,13 +237,13 @@ void TCPServer::dealRecv(TCPServer* s)
 		// 参数4：超时时间，如果超时，函数会返回WSA_WAIT_TIMEOUT，如果设置为0，函数会立即返回，如果设置为 WSA_INFINITE只有在某一个事件被传信后才会返回
 		// 参数5：在完成例程中会用到这个参数
 		// 返回：事件数组中有某一个事件被传信了，函数会返回这个事件的索引值，但是这个索引值需要减去预定义值 WSA_WAIT_EVENT_0才是这个事件在事件数组中的位置。
-		DWORD index = WSAWaitForMultipleEvents(s->m_clientCount, s->m_clientEvent, FALSE, 1000, FALSE);
+		DWORD index = WSAWaitForMultipleEvents(m_this->m_clientCount, m_this->m_clientEvent, FALSE, 1000, FALSE);
 		if (index == WSA_WAIT_TIMEOUT || index == WSA_WAIT_FAILED)
 			continue;
 
 		// 重置事件
 		index -= WSA_WAIT_EVENT_0;
-		WSAResetEvent(s->m_clientEvent[index]);
+		WSAResetEvent(m_this->m_clientEvent[index]);
 
 		// 来查询一下重叠操作的结果
 		// 参数1：SOCKET
@@ -243,7 +253,7 @@ void TCPServer::dealRecv(TCPServer* s)
 		// 参数5：负责接收结果标志
 		DWORD dwFlags;
 		DWORD byteTransferred;
-		clientOLData* clientData = s->m_clientData[index];
+		clientOLData* clientData = m_this->m_clientData[index];
 		WSAGetOverlappedResult(clientData->m_client, &(clientData->m_clientOver), &byteTransferred, FALSE, &dwFlags);
 		
 		// 处理断开连接
@@ -252,18 +262,18 @@ void TCPServer::dealRecv(TCPServer* s)
 			std::cout << "TCPServer client:" << index << " disconnect!\n";
 
 			// 关闭连接
-			s->m_clientCount--;
+			m_this->m_clientCount--;
 			closesocket(clientData->m_client);
-			WSACloseEvent(s->m_clientEvent[index]);
-			delete s->m_clientData[index];
+			WSACloseEvent(m_this->m_clientEvent[index]);
+			delete m_this->m_clientData[index];
 
 			// 删除数据
-			if (index < s->m_clientCount)
+			if (index < m_this->m_clientCount)
 			{
-				s->m_clientData[index] = s->m_clientData[s->m_clientCount];
-				s->m_clientEvent[index] = s->m_clientEvent[s->m_clientCount];
+				m_this->m_clientData[index] = m_this->m_clientData[m_this->m_clientCount];
+				m_this->m_clientEvent[index] = m_this->m_clientEvent[m_this->m_clientCount];
 			}
-			s->m_clientEvent[s->m_clientCount] = NULL;
+			m_this->m_clientEvent[m_this->m_clientCount] = NULL;
 		}
 		// 处理数据
 		else
@@ -275,7 +285,7 @@ void TCPServer::dealRecv(TCPServer* s)
 
 			// 重新让事件关联重叠结构
 			memset(&clientData->m_clientOver, 0, sizeof(clientData->m_clientOver));
-			clientData->m_clientOver.hEvent = s->m_clientEvent[index];
+			clientData->m_clientOver.hEvent = m_this->m_clientEvent[index];
 
 			char buff[MAX_BUFFER_LENG];
 			clientData->m_dataBuf.len = MAX_BUFFER_LENG;
@@ -297,9 +307,92 @@ void TCPServer::dealRecv(TCPServer* s)
 	}
 }
 
-
-void TCPServer::releaseSocket()
+bool TCPServer::startServerRoutine()
 {
-	closesocket(m_server);
-	WSACleanup();
+	// 接收连接
+	sockaddr_in cliAddr;
+	int len = sizeof(cliAddr);
+	SOCKET clientSocket = accept(m_server, (LPSOCKADDR)&cliAddr, &len);
+	if (clientSocket == INVALID_SOCKET)
+	{
+		std::cout << "TCPServer accept err.\n";
+		releaseSocket();
+		return false;
+	}
+	else
+	{
+		std::cout << "TCPServer: new client " << inet_ntoa(cliAddr.sin_addr) << ":" << cliAddr.sin_port << " connect!\n";
+
+		std::string k = "连接服务器成功!\n";
+		send(clientSocket, k.c_str(), k.size() + 1, 0);
+	}
+
+	// 建立重叠结构
+	WSAOVERLAPPED clientOver;
+	memset(&clientOver, 0, sizeof(clientOver));
+	m_clientEvent[0] = WSACreateEvent();
+
+	// 数据接收
+	WSABUF clientDataBuff;
+	char buff[MAX_BUFFER_LENG];
+	clientDataBuff.len = MAX_BUFFER_LENG;
+	clientDataBuff.buf = buff;
+	DWORD dwRecvBytes = 0;
+	DWORD dwFlags = 0;
+
+	// 投递一个 WSARecv，然后再socket上接收数据
+	if (WSARecv(clientSocket, &clientDataBuff, 1, &dwRecvBytes, &dwFlags, &clientOver, startServerRoutine_recvCallBack) == SOCKET_ERROR)
+	{
+		// WSA_IO_PENDING 表示I/O操作正在进行
+		if (WSAGetLastError() != WSA_IO_PENDING)
+		{
+			std::cout << "TCPServer WSARecv err.\n";
+			return false;
+		}
+	}
+
+	// 处理套接字上的重叠接收
+	while (true)
+	{
+		DWORD index = WSAWaitForMultipleEvents(1, m_clientEvent, FALSE, WSA_INFINITE, TRUE);
+		if (index == WAIT_IO_COMPLETION)
+			continue;
+		else
+		{
+			std::cout << "TCPServer WSAWaitForMultipleEvents err.\n";
+			return false;
+		}
+	}
+
+	releaseSocket();
+	return true;
+}
+
+void CALLBACK TCPServer::startServerRoutine_recvCallBack(DWORD dwError, DWORD cbTransferred, LPWSAOVERLAPPED lpOverlapped, DWORD dwFlags)
+{
+	if (dwError != 0 || cbTransferred == 0)
+	{
+		closesocket(m_this->m_clientSocket);
+		return;
+	}
+
+	memset(lpOverlapped, 0, sizeof(lpOverlapped));
+	WSABUF clientDataBuff;
+	char buff[MAX_BUFFER_LENG];
+	clientDataBuff.len = MAX_BUFFER_LENG;
+	clientDataBuff.buf = buff;
+
+	DWORD RecvBytes = 0;
+	DWORD Flags = 0;
+
+	// 投递一个 WSARecv，然后再socket上接收数据
+	if (WSARecv(m_this->m_clientSocket, &clientDataBuff, 1, &RecvBytes, &Flags, lpOverlapped, startServerRoutine_recvCallBack) == SOCKET_ERROR)
+	{
+		// WSA_IO_PENDING 表示I/O操作正在进行
+		if (WSAGetLastError() != WSA_IO_PENDING)
+		{
+			std::cout << "TCPServer WSARecv err.\n";
+			return;
+		}
+	}
 }
