@@ -41,6 +41,7 @@ TCPServer::TCPServer()
 	}
 
 	m_this = this;
+	m_clientCount = 0;
 }
 
 
@@ -48,6 +49,7 @@ TCPServer::~TCPServer()
 {
 	for (DWORD i = 0; i < m_clientCount; i++)
 	{
+		delete[] m_clientData[i]->m_dataBuf.buf;
 		delete m_clientData[i];
 		m_clientData[i] = NULL;
 	}
@@ -200,7 +202,7 @@ bool TCPServer::startServerEvent()
 		// 创建重叠结构
 		char buff[MAX_BUFFER_LENG];
 		clientOLData* clientData = new clientOLData();
-
+		memset(clientData, 0, sizeof(clientOLData));
 		clientData->m_client = client;
 		clientData->m_dataBuf.len = MAX_BUFFER_LENG;
 		clientData->m_dataBuf.buf = buff;
@@ -307,86 +309,206 @@ void TCPServer::startServerEvent_recvThread()
 	}
 }
 
-bool TCPServer::startServerRoutine()
+bool TCPServer::startServerRoutine_base()
 {
-	// 接收连接
-	sockaddr_in cliAddr;
-	int len = sizeof(cliAddr);
-	SOCKET clientSocket = accept(m_server, (LPSOCKADDR)&cliAddr, &len);
-	if (clientSocket == INVALID_SOCKET)
-	{
-		std::cout << "TCPServer accept err.\n";
-		releaseSocket();
-		return false;
-	}
-	else
-	{
-		std::cout << "TCPServer: new client " << inet_ntoa(cliAddr.sin_addr) << ":" << cliAddr.sin_port << " connect!\n";
+	// 创建伪事件
+	WSAEVENT clientEvent[1] = { WSACreateEvent() };
 
-		std::string k = "连接服务器成功!\n";
-		send(clientSocket, k.c_str(), k.size() + 1, 0);
-	}
-
-	// 建立重叠结构
-	WSAOVERLAPPED clientOver;
-	memset(&clientOver, 0, sizeof(clientOver));
-	m_clientEvent[0] = WSACreateEvent();
-
-	// 数据接收
-	WSABUF clientDataBuff;
-	char buff[MAX_BUFFER_LENG];
-	clientDataBuff.len = MAX_BUFFER_LENG;
-	clientDataBuff.buf = buff;
-	DWORD dwRecvBytes = 0;
-	DWORD dwFlags = 0;
-
-	// 投递一个 WSARecv，然后再socket上接收数据
-	if (WSARecv(clientSocket, &clientDataBuff, 1, &dwRecvBytes, &dwFlags, &clientOver, startServerRoutine_recvCallBack) == SOCKET_ERROR)
-	{
-		// WSA_IO_PENDING 表示I/O操作正在进行
-		if (WSAGetLastError() != WSA_IO_PENDING)
-		{
-			std::cout << "TCPServer WSARecv err.\n";
-			return false;
-		}
-	}
-
-	// 处理套接字上的重叠接收
 	while (true)
 	{
-		DWORD index = WSAWaitForMultipleEvents(1, m_clientEvent, FALSE, WSA_INFINITE, TRUE);
-		if (index == WAIT_IO_COMPLETION)
-			continue;
-		else
+		// 建立重叠结构
+		clientOLData* clientData = new clientOLData();
+		memset(clientData, 0, sizeof(*clientData));
+	
+		// 接收连接
+		sockaddr_in cliAddr;
+		int len = sizeof(cliAddr);
+		clientData->m_client = accept(m_server, (LPSOCKADDR)&cliAddr, &len);
+		if (clientData->m_client == INVALID_SOCKET)
 		{
-			std::cout << "TCPServer WSAWaitForMultipleEvents err.\n";
+			std::cout << "TCPServer accept err.\n";
+			releaseSocket();
+			delete clientData;
 			return false;
 		}
-	}
+		else
+		{
+			std::cout << "TCPServer: new client " << inet_ntoa(cliAddr.sin_addr) << ":" << cliAddr.sin_port << " connect!\n";
 
+			std::string k = "连接服务器成功!\n";
+			send(clientData->m_client, k.c_str(), k.size() + 1, 0);
+		}
+
+		// 新增客户端
+		clientData->m_dataBuf.len = MAX_BUFFER_LENG;
+		clientData->m_dataBuf.buf = new char[MAX_BUFFER_LENG];
+		m_clientData[m_clientCount++] = clientData;
+		
+		// 数据接收
+		DWORD dwRecvBytes = 0;
+		DWORD dwFlags = 0;
+
+		// 投递一个 WSARecv，然后再socket上接收数据
+		if (WSARecv(clientData->m_client, &clientData->m_dataBuf, 1, &dwRecvBytes, &dwFlags, &clientData->m_clientOver, startServerRoutine_recvCallBack) == SOCKET_ERROR)
+		{
+			// WSA_IO_PENDING 表示I/O操作正在进行
+			if (WSAGetLastError() != WSA_IO_PENDING)
+			{
+				std::cout << "TCPServer WSARecv err. " << WSAGetLastError() << std::endl;
+				return false;
+			}
+		}
+
+		// 处理套接字上的重叠接收
+		while (true)
+		{
+			//DWORD index = WSAWaitForMultipleEvents(1, clientEvent, FALSE, WSA_INFINITE, TRUE);
+			DWORD index = SleepEx(INFINITE, TRUE);
+			if (index == WAIT_IO_COMPLETION)
+			{
+				// 没有客户端了
+				if (m_clientCount == 0)
+					break;
+				else
+					continue;
+			}
+			else
+			{
+				std::cout << "TCPServer WSAWaitForMultipleEvents err.\n";
+				return false;
+			}
+		}
+	}
+	
 	releaseSocket();
 	return true;
 }
 
+bool TCPServer::startServerRoutine()
+{
+	std::thread t(startServerRoutine_overThread);
+	t.detach();
+
+	while (true)
+	{
+		clientOLData* clientData = new clientOLData;
+		memset(clientData, 0, sizeof(*clientData));
+
+		sockaddr_in cliAddr;
+		int len = sizeof(cliAddr);
+		clientData->m_client = accept(m_server, (LPSOCKADDR)&cliAddr, &len);
+		if (clientData->m_client == INVALID_SOCKET)
+		{
+			std::cout << "accept client err.\n";
+			delete clientData;
+			continue;
+		}
+		else
+		{
+			std::cout << "TCPServer: new client " << inet_ntoa(cliAddr.sin_addr) << ":" << cliAddr.sin_port << " connect!\n";
+
+			std::string k = "连接服务器成功!\n";
+			send(clientData->m_client, k.c_str(), k.size() + 1, 0);
+		}
+
+		// 新增客户端
+		clientData->m_dataBuf.len = MAX_BUFFER_LENG;
+		clientData->m_dataBuf.buf = new char[MAX_BUFFER_LENG];
+		clientData->m_bPostRecv = false;
+		clientData->m_index = m_clientCount;
+		m_clientData[m_clientCount] = clientData;
+		m_clientCount++;
+	}
+	return false;
+}
+
+void TCPServer::startServerRoutine_overThread()
+{
+	// 创建伪事件
+	WSAEVENT clientEvent[1] = { WSACreateEvent() };
+	DWORD lastCheckCount = 0;
+	while (true)
+	{
+		// 这里暂不考虑离开和加入同时进行时 人数不变但是有人需要
+		if (m_this->m_clientCount > lastCheckCount)
+		{
+			std::cout << "new client to recv.\n";
+
+			for (DWORD i = 0; i < m_this->m_clientCount; i++)
+			{
+				clientOLData* clientData = m_this->m_clientData[i];
+				
+				if (!clientData->m_bPostRecv)
+				{
+					DWORD dwRecvByte = 0;
+					DWORD dwFlags = 0;
+					if (WSARecv(clientData->m_client, &clientData->m_dataBuf, 1, &dwRecvByte, &dwFlags, &clientData->m_clientOver, startServerRoutine_recvCallBack) == SOCKET_ERROR)
+					{
+						// WSA_IO_PENDING 表示I/O操作正在进行
+						if (WSAGetLastError() != WSA_IO_PENDING)
+						{
+							std::cout << "TCPServer WSARecv err. " << WSAGetLastError() << std::endl;
+							return;
+						}
+					}
+
+					clientData->m_bPostRecv = true;
+				}
+			}
+		}
+		lastCheckCount = m_this->m_clientCount;
+	
+		if (m_this->m_clientCount > 0)
+		{
+			//DWORD index = WSAWaitForMultipleEvents(1, clientEvent, FALSE, WSA_INFINITE, TRUE);
+			//DWORD index = SleepEx(1000, TRUE);
+			DWORD index = SleepEx(INFINITE, TRUE);		// 死等的参数会导致收不到新连接的客户端,只有等有人发消息才能开始关注新客户端的消息动态
+			if (index == WAIT_IO_COMPLETION || index == 0)
+				continue;
+			else
+				break;
+		}
+	}
+}
+
 void CALLBACK TCPServer::startServerRoutine_recvCallBack(DWORD dwError, DWORD cbTransferred, LPWSAOVERLAPPED lpOverlapped, DWORD dwFlags)
 {
+	// 由于WSARecv投递的是WSAOVERLAPPED的地址，而WSAOVERLAPPED是对象clientOLData的第一个成员，所以强转后可以获得原clientOLData的地址
+	clientOLData* clientData = (clientOLData *)lpOverlapped;
+
+	// 连接断开
 	if (dwError != 0 || cbTransferred == 0)
 	{
-		closesocket(m_this->m_clientSocket);
+		std::cout << "TCPServer client disconnect!\n";
+
+		int index = clientData->m_index;
+
+		// 清理数据
+		closesocket(clientData->m_client);
+		delete[] clientData->m_dataBuf.buf;
+		delete clientData;
+		clientData = NULL;
+
+		// 把最后一个元素移动到离开的玩家位置
+		m_this->m_clientCount--;
+		m_this->m_clientData[index] = m_this->m_clientData[m_this->m_clientCount];
+		m_this->m_clientData[m_this->m_clientCount] = NULL;
 		return;
 	}
+	// 接收数据成功
+	std::cout << clientData->m_dataBuf.buf << std::endl;
 
+	std::string k = "服务器收到消息!\n";
+	send(clientData->m_client, k.c_str(), k.size() + 1, 0);
+
+	// 继续等待
 	memset(lpOverlapped, 0, sizeof(lpOverlapped));
-	WSABUF clientDataBuff;
-	char buff[MAX_BUFFER_LENG];
-	clientDataBuff.len = MAX_BUFFER_LENG;
-	clientDataBuff.buf = buff;
+	memset(clientData->m_dataBuf.buf, '\0', sizeof(clientData->m_dataBuf));
 
 	DWORD RecvBytes = 0;
 	DWORD Flags = 0;
-
 	// 投递一个 WSARecv，然后再socket上接收数据
-	if (WSARecv(m_this->m_clientSocket, &clientDataBuff, 1, &RecvBytes, &Flags, lpOverlapped, startServerRoutine_recvCallBack) == SOCKET_ERROR)
+	if (WSARecv(clientData->m_client, &clientData->m_dataBuf, 1, &RecvBytes, &Flags, lpOverlapped, startServerRoutine_recvCallBack) == SOCKET_ERROR)
 	{
 		// WSA_IO_PENDING 表示I/O操作正在进行
 		if (WSAGetLastError() != WSA_IO_PENDING)

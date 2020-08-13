@@ -19,10 +19,12 @@
 
 struct clientOLData
 {
+	WSAOVERLAPPED	m_clientOver;
 	SOCKET			m_client;
 	WSABUF			m_dataBuf;
-	WSAOVERLAPPED	m_clientOver;
-	
+
+	bool			m_bPostRecv;
+	int				m_index;
 };
 
 class TCPServer
@@ -33,9 +35,6 @@ private:
 	DWORD			m_clientCount = 0;
 	WSAEVENT		m_clientEvent[WSA_MAXIMUM_WAIT_EVENTS] = {};
 	clientOLData*	m_clientData[WSA_MAXIMUM_WAIT_EVENTS] = {};
-
-
-	
 
 	// 释放
 	void releaseSocket();
@@ -60,8 +59,12 @@ public:
 
 	// 完成例程其实就是一些函数，我们将这些函数传递给重叠I/O请求，以供重叠I/O请求完成时由系统调用。
 
-	// 重叠I/O - 完成例程
+	// 重叠I/O - 完成例程 基础版本（该版本每次只能服务一个客户端）
+	bool startServerRoutine_base();
+
 	bool startServerRoutine();
+
+	static void startServerRoutine_overThread();
 
 	static void CALLBACK startServerRoutine_recvCallBack(DWORD dwError, DWORD cbTransferred, LPWSAOVERLAPPED lpOverlapped, DWORD dwFlags);
 

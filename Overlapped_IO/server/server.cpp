@@ -11,7 +11,12 @@ int main()
 	TCPServer server;
 	//server.startServerEvent_base();
 	//server.startServerEvent();
+	//server.startServerRoutine_base();
 	server.startServerRoutine();
 
+
+	// 退出前查看内存是否有泄漏
+	_CrtDumpMemoryLeaks();
+	system("pause");
 	return 0;
 }
